@@ -581,7 +581,7 @@ struct VoicePipelineView: View {
             // Level monitoring
             levelTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
                 audioRecorder?.updateMeters()
-                let dB = audioRecorder?.averagePower(forChannel: 0) ?? -60
+                let dB = Double(audioRecorder?.averagePower(forChannel: 0) ?? -60)
                 audioLevel = max(0, min(1, (dB + 60) / 60))
             }
             

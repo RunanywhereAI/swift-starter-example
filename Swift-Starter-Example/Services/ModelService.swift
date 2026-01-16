@@ -90,9 +90,10 @@ final class ModelService: ObservableObject {
             llmDownloadProgress = 0.0
             
             do {
-                for try await progress in RunAnywhere.downloadModel(Self.llmModelId) {
-                    llmDownloadProgress = progress.percentage
-                    if progress.state == .completed || progress.state == .failed {
+                let progressStream = try await RunAnywhere.downloadModel(Self.llmModelId)
+                for await progress in progressStream {
+                    llmDownloadProgress = progress.overallProgress
+                    if progress.stage == .completed {
                         break
                     }
                 }
@@ -131,9 +132,10 @@ final class ModelService: ObservableObject {
             sttDownloadProgress = 0.0
             
             do {
-                for try await progress in RunAnywhere.downloadModel(Self.sttModelId) {
-                    sttDownloadProgress = progress.percentage
-                    if progress.state == .completed || progress.state == .failed {
+                let progressStream = try await RunAnywhere.downloadModel(Self.sttModelId)
+                for await progress in progressStream {
+                    sttDownloadProgress = progress.overallProgress
+                    if progress.stage == .completed {
                         break
                     }
                 }
@@ -172,9 +174,10 @@ final class ModelService: ObservableObject {
             ttsDownloadProgress = 0.0
             
             do {
-                for try await progress in RunAnywhere.downloadModel(Self.ttsModelId) {
-                    ttsDownloadProgress = progress.percentage
-                    if progress.state == .completed || progress.state == .failed {
+                let progressStream = try await RunAnywhere.downloadModel(Self.ttsModelId)
+                for await progress in progressStream {
+                    ttsDownloadProgress = progress.overallProgress
+                    if progress.stage == .completed {
                         break
                     }
                 }
@@ -212,11 +215,22 @@ final class ModelService: ObservableObject {
     func unloadAllModels() async {
         do {
             try await RunAnywhere.unloadModel()
+        } catch {
+            print("LLM unload error: \(error)")
+        }
+        
+        do {
             try await RunAnywhere.unloadSTTModel()
+        } catch {
+            print("STT unload error: \(error)")
+        }
+        
+        do {
             try await RunAnywhere.unloadTTSVoice()
         } catch {
-            print("Unload error: \(error)")
+            print("TTS unload error: \(error)")
         }
+        
         await refreshLoadedStates()
     }
 }
