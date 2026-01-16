@@ -123,13 +123,14 @@ struct HomeView: View {
                 ChatView()
                     .environmentObject(modelService)
             } label: {
-                FeatureCard(
+                FeatureCardLabel(
                     title: "Chat",
                     subtitle: "LLM Text Generation",
                     icon: "bubble.left.and.bubble.right.fill",
                     gradientColors: [AppColors.accentCyan, Color(hex: "0EA5E9")]
-                ) { }
+                )
             }
+            .buttonStyle(ScaleButtonStyle())
             .frame(height: 180)
             
             // Speech to Text
@@ -137,13 +138,14 @@ struct HomeView: View {
                 SpeechToTextView()
                     .environmentObject(modelService)
             } label: {
-                FeatureCard(
+                FeatureCardLabel(
                     title: "Speech",
                     subtitle: "Speech to Text",
                     icon: "mic.fill",
                     gradientColors: [AppColors.accentViolet, Color(hex: "7C3AED")]
-                ) { }
+                )
             }
+            .buttonStyle(ScaleButtonStyle())
             .frame(height: 180)
             
             // Text to Speech
@@ -151,13 +153,14 @@ struct HomeView: View {
                 TextToSpeechView()
                     .environmentObject(modelService)
             } label: {
-                FeatureCard(
+                FeatureCardLabel(
                     title: "Voice",
                     subtitle: "Text to Speech",
                     icon: "speaker.wave.3.fill",
                     gradientColors: [AppColors.accentPink, Color(hex: "DB2777")]
-                ) { }
+                )
             }
+            .buttonStyle(ScaleButtonStyle())
             .frame(height: 180)
             
             // Voice Pipeline
@@ -165,13 +168,14 @@ struct HomeView: View {
                 VoicePipelineView()
                     .environmentObject(modelService)
             } label: {
-                FeatureCard(
+                FeatureCardLabel(
                     title: "Pipeline",
                     subtitle: "Voice Agent",
                     icon: "sparkles",
                     gradientColors: [AppColors.accentGreen, Color(hex: "059669")]
-                ) { }
+                )
             }
+            .buttonStyle(ScaleButtonStyle())
             .frame(height: 180)
         }
     }
@@ -179,9 +183,9 @@ struct HomeView: View {
     // MARK: - Model Info Section
     private var modelInfoSection: some View {
         VStack(spacing: 12) {
-            modelInfoRow(icon: "cpu", title: "LLM", value: "SmolLM2 360M")
+            modelInfoRow(icon: "cpu", title: "LLM", value: "LFM2 350M Q4")
             modelInfoRow(icon: "ear", title: "STT", value: "Whisper Tiny")
-            modelInfoRow(icon: "waveform", title: "TTS", value: "Piper")
+            modelInfoRow(icon: "waveform", title: "TTS", value: "Piper US")
         }
         .padding(20)
         .background(AppColors.surfaceCard.opacity(0.5))

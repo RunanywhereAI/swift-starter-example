@@ -14,38 +14,61 @@ import ONNXRuntime
 @main
 struct Swift_Starter_ExampleApp: App {
     @StateObject private var modelService = ModelService()
-    
-    init() {
-        // Initialize the RunAnywhere SDK
-        initializeSDK()
-    }
+    @State private var isSDKInitialized = false
     
     var body: some Scene {
         WindowGroup {
-            HomeView()
-                .environmentObject(modelService)
-                .preferredColorScheme(.dark)
+            Group {
+                if isSDKInitialized {
+                    HomeView()
+                        .environmentObject(modelService)
+                } else {
+                    // Loading view while SDK initializes
+                    VStack(spacing: 20) {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                        Text("Initializing AI...")
+                            .font(.headline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(UIColor.systemBackground))
+                }
+            }
+            .preferredColorScheme(.dark)
+            .task {
+                // Use async initialization like the SDK example
+                await initializeSDK()
+            }
         }
     }
     
-    private func initializeSDK() {
+    @MainActor
+    private func initializeSDK() async {
         do {
             // Initialize the RunAnywhere SDK in development mode
             try RunAnywhere.initialize(environment: .development)
             
-            // Register the LlamaCPP backend for LLM text generation
+            // Register backends BEFORE models
             LlamaCPP.register()
-            
-            // Register the ONNX backend for STT, TTS, and VAD
             ONNX.register()
             
-            // Register default models
+            // Register default models - this must happen before model discovery completes
             ModelService.registerDefaultModels()
             
             print("✅ RunAnywhere SDK initialized successfully")
             print("   Version: \(RunAnywhere.version)")
+            
+            // Mark as initialized
+            isSDKInitialized = true
+            
+            // Refresh model service state after initialization
+            await modelService.refreshLoadedStates()
+            
         } catch {
             print("❌ Failed to initialize RunAnywhere SDK: \(error)")
+            // Still show UI even if initialization fails
+            isSDKInitialized = true
         }
     }
 }

@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import AVFoundation
 import RunAnywhere
 
 struct TextToSpeechView: View {
@@ -15,9 +14,7 @@ struct TextToSpeechView: View {
     
     @State private var inputText = ""
     @State private var isSynthesizing = false
-    @State private var isPlaying = false
     @State private var speechRate: Float = 1.0
-    @State private var audioPlayer: AVAudioPlayer?
     
     private let sampleTexts = [
         "Hello! Welcome to RunAnywhere. Experience the power of on-device AI.",
@@ -73,7 +70,10 @@ struct TextToSpeechView: View {
             }
         }
         .onDisappear {
-            audioPlayer?.stop()
+            // Stop any ongoing speech when leaving
+            Task {
+                await RunAnywhere.stopSpeaking()
+            }
         }
     }
     
@@ -157,13 +157,8 @@ struct TextToSpeechView: View {
     private var playbackSection: some View {
         VStack(spacing: 24) {
             // Visualization area
-            if isPlaying {
-                playingAnimation
-            } else if isSynthesizing {
-                ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle(tint: AppColors.accentPink))
-                    .scaleEffect(1.2)
-                    .frame(height: 60)
+            if isSynthesizing {
+                speakingAnimation
             } else {
                 Image(systemName: "speaker.wave.3.fill")
                     .font(.system(size: 48))
@@ -171,50 +166,35 @@ struct TextToSpeechView: View {
                     .frame(height: 60)
             }
             
-            // Play button
-            HStack(spacing: 16) {
-                if audioPlayer != nil && !isSynthesizing {
-                    Button {
-                        isPlaying ? stopPlayback() : replayAudio()
-                    } label: {
-                        Image(systemName: isPlaying ? "stop.fill" : "arrow.counterclockwise")
-                            .font(.system(size: 28))
-                            .foregroundStyle(AppColors.textSecondary)
+            // Speak button
+            Button {
+                synthesize()
+            } label: {
+                ZStack {
+                    Circle()
+                        .fill(
+                            isSynthesizing
+                                ? LinearGradient(colors: [AppColors.textMuted, AppColors.textMuted], startPoint: .top, endPoint: .bottom)
+                                : LinearGradient(colors: [AppColors.accentPink, Color(hex: "DB2777")], startPoint: .topLeading, endPoint: .bottomTrailing)
+                        )
+                        .shadow(color: AppColors.accentPink.opacity(0.4), radius: 20, y: 8)
+                    
+                    if isSynthesizing {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    } else {
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 40, weight: .medium))
+                            .foregroundStyle(.white)
                     }
                 }
-                
-                Button {
-                    synthesize()
-                } label: {
-                    ZStack {
-                        Circle()
-                            .fill(
-                                isSynthesizing
-                                    ? LinearGradient(colors: [AppColors.textMuted, AppColors.textMuted], startPoint: .top, endPoint: .bottom)
-                                    : LinearGradient(colors: [AppColors.accentPink, Color(hex: "DB2777")], startPoint: .topLeading, endPoint: .bottomTrailing)
-                            )
-                            .shadow(color: AppColors.accentPink.opacity(0.4), radius: 20, y: 8)
-                        
-                        if isSynthesizing {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        } else {
-                            Image(systemName: "play.fill")
-                                .font(.system(size: 40, weight: .medium))
-                                .foregroundStyle(.white)
-                        }
-                    }
-                    .frame(width: 80, height: 80)
-                }
-                .disabled(isSynthesizing || isPlaying)
+                .frame(width: 80, height: 80)
             }
+            .disabled(isSynthesizing)
             
-            Text(
-                isSynthesizing ? "Synthesizing..." :
-                    isPlaying ? "Playing..." : "Tap to synthesize"
-            )
-            .font(AppFonts.bodyMedium())
-            .foregroundStyle(AppColors.textSecondary)
+            Text(isSynthesizing ? "Speaking..." : "Tap to speak")
+                .font(AppFonts.bodyMedium())
+                .foregroundStyle(AppColors.textSecondary)
         }
         .padding(24)
         .background(
@@ -228,14 +208,14 @@ struct TextToSpeechView: View {
         .overlay(
             RoundedRectangle(cornerRadius: 20)
                 .stroke(
-                    isPlaying ? AppColors.accentPink.opacity(0.5) : AppColors.textMuted.opacity(0.1),
-                    lineWidth: isPlaying ? 2 : 1
+                    isSynthesizing ? AppColors.accentPink.opacity(0.5) : AppColors.textMuted.opacity(0.1),
+                    lineWidth: isSynthesizing ? 2 : 1
                 )
         )
-        .shadow(color: isPlaying ? AppColors.accentPink.opacity(0.2) : .clear, radius: 30)
+        .shadow(color: isSynthesizing ? AppColors.accentPink.opacity(0.2) : .clear, radius: 30)
     }
     
-    private var playingAnimation: some View {
+    private var speakingAnimation: some View {
         HStack(spacing: 8) {
             ForEach(0..<7, id: \.self) { index in
                 RoundedRectangle(cornerRadius: 3)
@@ -246,7 +226,7 @@ struct TextToSpeechView: View {
                         .easeInOut(duration: 0.4)
                             .repeatForever(autoreverses: true)
                             .delay(Double(index) * 0.1),
-                        value: isPlaying
+                        value: isSynthesizing
                     )
             }
         }
@@ -303,29 +283,17 @@ struct TextToSpeechView: View {
         
         Task {
             do {
-                let output = try await RunAnywhere.synthesize(
-                    text,
-                    options: TTSOptions(rate: speechRate)
-                )
+                let options = TTSOptions(rate: speechRate)
                 
-                // Play the audio
+                // SDK handles both synthesis AND playback internally - no manual audio handling needed!
+                let result = try await RunAnywhere.speak(text, options: options)
+                
                 await MainActor.run {
-                    do {
-                        audioPlayer = try AVAudioPlayer(data: output.audioData)
-                        audioPlayer?.delegate = AudioPlayerDelegate.shared
-                        AudioPlayerDelegate.shared.onComplete = {
-                            DispatchQueue.main.async {
-                                isPlaying = false
-                            }
-                        }
-                        audioPlayer?.play()
-                        isSynthesizing = false
-                        isPlaying = true
-                    } catch {
-                        isSynthesizing = false
-                    }
+                    isSynthesizing = false
+                    print("✅ Speech completed, duration: \(result.duration)s")
                 }
             } catch {
+                print("❌ TTS error: \(error)")
                 await MainActor.run {
                     isSynthesizing = false
                 }
@@ -333,26 +301,6 @@ struct TextToSpeechView: View {
         }
     }
     
-    private func replayAudio() {
-        audioPlayer?.currentTime = 0
-        audioPlayer?.play()
-        isPlaying = true
-    }
-    
-    private func stopPlayback() {
-        audioPlayer?.stop()
-        isPlaying = false
-    }
-}
-
-// MARK: - Audio Player Delegate
-class AudioPlayerDelegate: NSObject, AVAudioPlayerDelegate {
-    static let shared = AudioPlayerDelegate()
-    var onComplete: (() -> Void)?
-    
-    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-        onComplete?()
-    }
 }
 
 #Preview {
