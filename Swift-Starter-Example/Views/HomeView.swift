@@ -133,6 +133,51 @@ struct HomeView: View {
             .buttonStyle(ScaleButtonStyle())
             .frame(height: 180)
             
+            // Tool Calling
+            NavigationLink {
+                ToolCallingView()
+                    .environmentObject(modelService)
+            } label: {
+                FeatureCardLabel(
+                    title: "Tools",
+                    subtitle: "Tool Calling",
+                    icon: "wrench.and.screwdriver.fill",
+                    gradientColors: [AppColors.accentOrange, Color(hex: "E67E22")]
+                )
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .frame(height: 180)
+            
+            // Vision (VLM)
+            NavigationLink {
+                VisionView()
+                    .environmentObject(modelService)
+            } label: {
+                FeatureCardLabel(
+                    title: "Vision",
+                    subtitle: "Image Understanding",
+                    icon: "eye.fill",
+                    gradientColors: [AppColors.accentPink, Color(hex: "DB2777")]
+                )
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .frame(height: 180)
+            
+            // Diffusion (Image Generation)
+            NavigationLink {
+                ImageGenerationView()
+                    .environmentObject(modelService)
+            } label: {
+                FeatureCardLabel(
+                    title: "Diffusion",
+                    subtitle: "Image Generation",
+                    icon: "paintbrush.fill",
+                    gradientColors: [AppColors.accentGreen, Color(hex: "059669")]
+                )
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .frame(height: 180)
+            
             // Speech to Text
             NavigationLink {
                 SpeechToTextView()
@@ -157,7 +202,7 @@ struct HomeView: View {
                     title: "Voice",
                     subtitle: "Text to Speech",
                     icon: "speaker.wave.3.fill",
-                    gradientColors: [AppColors.accentPink, Color(hex: "DB2777")]
+                    gradientColors: [Color(hex: "6366F1"), Color(hex: "4F46E5")]
                 )
             }
             .buttonStyle(ScaleButtonStyle())
@@ -172,7 +217,7 @@ struct HomeView: View {
                     title: "Pipeline",
                     subtitle: "Voice Agent",
                     icon: "sparkles",
-                    gradientColors: [AppColors.accentGreen, Color(hex: "059669")]
+                    gradientColors: [Color(hex: "14B8A6"), Color(hex: "0D9488")]
                 )
             }
             .buttonStyle(ScaleButtonStyle())
@@ -184,6 +229,8 @@ struct HomeView: View {
     private var modelInfoSection: some View {
         VStack(spacing: 12) {
             modelInfoRow(icon: "cpu", title: "LLM", value: "LFM2 350M Q4")
+            modelInfoRow(icon: "eye", title: "VLM", value: "SmolVLM 256M")
+            modelInfoRow(icon: "paintbrush", title: "Diffusion", value: "SD 1.5 CoreML")
             modelInfoRow(icon: "ear", title: "STT", value: "Whisper Tiny")
             modelInfoRow(icon: "waveform", title: "TTS", value: "Piper US")
         }

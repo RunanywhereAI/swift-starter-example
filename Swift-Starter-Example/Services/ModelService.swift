@@ -18,25 +18,38 @@ final class ModelService: ObservableObject {
     static let llmModelId = "lfm2-350m-q4_k_m"
     static let sttModelId = "sherpa-onnx-whisper-tiny.en"
     static let ttsModelId = "vits-piper-en_US-lessac-medium"
+    static let vlmModelId = "smolvlm-256m-instruct"
+    static let diffusionModelId = "sd15-coreml-palettized"
     
     // MARK: - Download State
     @Published var isLLMDownloading = false
     @Published var isSTTDownloading = false
     @Published var isTTSDownloading = false
+    @Published var isVLMDownloading = false
+    @Published var isDiffusionDownloading = false
     
     @Published var llmDownloadProgress: Double = 0.0
     @Published var sttDownloadProgress: Double = 0.0
     @Published var ttsDownloadProgress: Double = 0.0
+    @Published var vlmDownloadProgress: Double = 0.0
+    @Published var diffusionDownloadProgress: Double = 0.0
     
     // MARK: - Load State
     @Published var isLLMLoading = false
     @Published var isSTTLoading = false
     @Published var isTTSLoading = false
+    @Published var isVLMLoading = false
+    @Published var isDiffusionLoading = false
     
     // MARK: - Loaded State
     @Published private(set) var isLLMLoaded = false
     @Published private(set) var isSTTLoaded = false
     @Published private(set) var isTTSLoaded = false
+    @Published private(set) var isVLMLoaded = false
+    @Published private(set) var isDiffusionLoaded = false
+    
+    /// Status message for diffusion (loading can take minutes for CoreML compilation)
+    @Published var diffusionStatusMessage = ""
     
     // MARK: - Computed Properties
     var isVoiceAgentReady: Bool {
@@ -44,11 +57,11 @@ final class ModelService: ObservableObject {
     }
     
     var isAnyDownloading: Bool {
-        isLLMDownloading || isSTTDownloading || isTTSDownloading
+        isLLMDownloading || isSTTDownloading || isTTSDownloading || isVLMDownloading || isDiffusionDownloading
     }
     
     var isAnyLoading: Bool {
-        isLLMLoading || isSTTLoading || isTTSLoading
+        isLLMLoading || isSTTLoading || isTTSLoading || isVLMLoading || isDiffusionLoading
     }
     
     // MARK: - Initialization
@@ -98,7 +111,36 @@ final class ModelService: ObservableObject {
             )
         }
         
-        print("✅ Models registered: LLM, STT, TTS")
+        // Register VLM model - SmolVLM 256M (tiny multimodal model, GGUF + mmproj)
+        let vlmModelURL = URL(string: "https://huggingface.co/ggml-org/SmolVLM-256M-Instruct-GGUF/resolve/main/SmolVLM-256M-Instruct-Q8_0.gguf")!
+        let vlmMmprojURL = URL(string: "https://huggingface.co/ggml-org/SmolVLM-256M-Instruct-GGUF/resolve/main/mmproj-SmolVLM-256M-Instruct-f16.gguf")!
+        
+        RunAnywhere.registerMultiFileModel(
+            id: vlmModelId,
+            name: "SmolVLM 256M Instruct (Q8)",
+            files: [
+                ModelFileDescriptor(url: vlmModelURL, filename: "SmolVLM-256M-Instruct-Q8_0.gguf"),
+                ModelFileDescriptor(url: vlmMmprojURL, filename: "mmproj-SmolVLM-256M-Instruct-f16.gguf"),
+            ],
+            framework: .llamaCpp,
+            modality: .multimodal,
+            memoryRequirement: 365_000_000
+        )
+        
+        // Register Diffusion model - Apple Stable Diffusion 1.5 CoreML (palettized, split_einsum_v2 for ANE)
+        if let sd15URL = URL(string: "https://huggingface.co/apple/coreml-stable-diffusion-v1-5-palettized/resolve/main/coreml-stable-diffusion-v1-5-palettized_split_einsum_v2_compiled.zip") {
+            RunAnywhere.registerModel(
+                id: diffusionModelId,
+                name: "Stable Diffusion 1.5 (CoreML)",
+                url: sd15URL,
+                framework: .coreml,
+                modality: .imageGeneration,
+                artifactType: .archive(.zip, structure: .nestedDirectory),
+                memoryRequirement: 1_600_000_000
+            )
+        }
+        
+        print("✅ Models registered: LLM, STT, TTS, VLM, Diffusion")
     }
     
     // MARK: - State Refresh
@@ -106,6 +148,8 @@ final class ModelService: ObservableObject {
         isLLMLoaded = await RunAnywhere.isModelLoaded
         isSTTLoaded = await RunAnywhere.isSTTModelLoaded
         isTTSLoaded = await RunAnywhere.isTTSVoiceLoaded
+        isVLMLoaded = await RunAnywhere.isVLMModelLoaded
+        isDiffusionLoaded = await RunAnywhere.isDiffusionModelLoaded
     }
     
     // MARK: - LLM Operations
@@ -259,6 +303,156 @@ final class ModelService: ObservableObject {
         }
         
         isTTSLoading = false
+    }
+    
+    // MARK: - VLM Operations
+    /// Download and load VLM model (SmolVLM 256M - multimodal)
+    func downloadAndLoadVLM() async {
+        guard !isVLMDownloading && !isVLMLoading else { return }
+        
+        // Try to load first if already downloaded
+        isVLMLoading = true
+        do {
+            let models = try await RunAnywhere.availableModels()
+            if let vlmModel = models.first(where: { $0.id == Self.vlmModelId && $0.isDownloaded }) {
+                try await RunAnywhere.loadVLMModel(vlmModel)
+                isVLMLoaded = true
+                isVLMLoading = false
+                print("✅ VLM model loaded from cache")
+                return
+            }
+        } catch {
+            print("VLM load attempt failed (will download): \(error)")
+        }
+        isVLMLoading = false
+        
+        // Download the model
+        isVLMDownloading = true
+        vlmDownloadProgress = 0.0
+        
+        do {
+            let progressStream = try await RunAnywhere.downloadModel(Self.vlmModelId)
+            for await progress in progressStream {
+                vlmDownloadProgress = progress.overallProgress
+                if progress.stage == .completed {
+                    break
+                }
+            }
+        } catch {
+            print("VLM download error: \(error)")
+            isVLMDownloading = false
+            return
+        }
+        
+        isVLMDownloading = false
+        
+        // Load the model after download
+        isVLMLoading = true
+        
+        do {
+            let models = try await RunAnywhere.availableModels()
+            if let vlmModel = models.first(where: { $0.id == Self.vlmModelId }) {
+                try await RunAnywhere.loadVLMModel(vlmModel)
+                isVLMLoaded = true
+            } else {
+                print("VLM model not found in registry after download")
+            }
+        } catch {
+            print("VLM load error: \(error)")
+        }
+        
+        isVLMLoading = false
+    }
+    
+    // MARK: - Diffusion Operations
+    /// Download and load Diffusion model (Stable Diffusion 1.5 CoreML)
+    /// Note: First-time CoreML compilation can take 5-15 minutes
+    func downloadAndLoadDiffusion() async {
+        guard !isDiffusionDownloading && !isDiffusionLoading else { return }
+        
+        // Try to load first if already downloaded
+        isDiffusionLoading = true
+        diffusionStatusMessage = "Checking for cached model..."
+        do {
+            let models = try await RunAnywhere.availableModels()
+            if let model = models.first(where: { $0.id == Self.diffusionModelId && $0.isDownloaded }),
+               let path = model.localPath {
+                diffusionStatusMessage = "Loading CoreML pipeline (first time may take 5-15 min)..."
+                let config = DiffusionConfiguration(
+                    modelVariant: .sd15,
+                    enableSafetyChecker: true,
+                    reduceMemory: true
+                )
+                try await RunAnywhere.loadDiffusionModel(
+                    modelPath: path.path,
+                    modelId: model.id,
+                    modelName: model.name,
+                    configuration: config
+                )
+                isDiffusionLoaded = true
+                isDiffusionLoading = false
+                diffusionStatusMessage = "Model loaded"
+                print("✅ Diffusion model loaded from cache")
+                return
+            }
+        } catch {
+            print("Diffusion load attempt failed (will download): \(error)")
+        }
+        isDiffusionLoading = false
+        
+        // Download the model
+        isDiffusionDownloading = true
+        diffusionDownloadProgress = 0.0
+        diffusionStatusMessage = "Downloading (~1.6 GB)..."
+        
+        do {
+            let progressStream = try await RunAnywhere.downloadModel(Self.diffusionModelId)
+            for await progress in progressStream {
+                diffusionDownloadProgress = progress.overallProgress
+                if progress.stage == .completed {
+                    break
+                }
+            }
+        } catch {
+            print("Diffusion download error: \(error)")
+            diffusionStatusMessage = "Download failed"
+            isDiffusionDownloading = false
+            return
+        }
+        
+        isDiffusionDownloading = false
+        
+        // Load the model after download
+        isDiffusionLoading = true
+        diffusionStatusMessage = "Loading CoreML pipeline (first time may take 5-15 min)..."
+        
+        do {
+            let models = try await RunAnywhere.availableModels()
+            if let model = models.first(where: { $0.id == Self.diffusionModelId }),
+               let path = model.localPath {
+                let config = DiffusionConfiguration(
+                    modelVariant: .sd15,
+                    enableSafetyChecker: true,
+                    reduceMemory: true
+                )
+                try await RunAnywhere.loadDiffusionModel(
+                    modelPath: path.path,
+                    modelId: model.id,
+                    modelName: model.name,
+                    configuration: config
+                )
+                isDiffusionLoaded = true
+                diffusionStatusMessage = "Model loaded"
+            } else {
+                print("Diffusion model not found in registry after download")
+                diffusionStatusMessage = "Model not found after download"
+            }
+        } catch {
+            print("Diffusion load error: \(error)")
+            diffusionStatusMessage = "Load failed: \(error.localizedDescription)"
+        }
+        
+        isDiffusionLoading = false
     }
     
     // MARK: - Batch Operations

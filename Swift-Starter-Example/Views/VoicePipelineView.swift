@@ -62,7 +62,6 @@ struct VoicePipelineView: View {
     @State private var audioRecorder: AVAudioRecorder?
     @State private var levelTimer: Timer?
     @State private var recordingURL: URL?
-    @State private var audioPlayer: AVAudioPlayer?
     
     var body: some View {
         ZStack {
@@ -629,22 +628,11 @@ struct VoicePipelineView: View {
                         currentState = .speaking
                     }
                     
-                    // Synthesize and play
-                    let output = try await RunAnywhere.synthesize(response)
+                    // Speak the response - SDK handles PCM→WAV conversion and audio playback
+                    _ = try await RunAnywhere.speak(response)
                     
                     await MainActor.run {
-                        do {
-                            audioPlayer = try AVAudioPlayer(data: output.audioData)
-                            audioPlayer?.delegate = VoicePipelineDelegate.shared
-                            VoicePipelineDelegate.shared.onComplete = { [self] in
-                                DispatchQueue.main.async {
-                                    completeTurn()
-                                }
-                            }
-                            audioPlayer?.play()
-                        } catch {
-                            completeTurn()
-                        }
+                        completeTurn()
                     }
                 } else {
                     await MainActor.run {
@@ -692,22 +680,11 @@ struct VoicePipelineView: View {
     private func stopSession() {
         levelTimer?.invalidate()
         audioRecorder?.stop()
-        audioPlayer?.stop()
         
         isSessionActive = false
         status = "Ready"
         currentState = .idle
         audioLevel = 0
-    }
-}
-
-// MARK: - Voice Pipeline Delegate
-class VoicePipelineDelegate: NSObject, AVAudioPlayerDelegate {
-    static let shared = VoicePipelineDelegate()
-    var onComplete: (() -> Void)?
-    
-    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-        onComplete?()
     }
 }
 
