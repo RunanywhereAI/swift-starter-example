@@ -8,12 +8,20 @@
 import SwiftUI
 import RunAnywhere
 
+#if os(iOS)
+import UIKit
+private typealias PlatformImage = UIImage
+#elseif os(macOS)
+import AppKit
+private typealias PlatformImage = NSImage
+#endif
+
 struct ImageGenerationView: View {
     @EnvironmentObject var modelService: ModelService
     
     @State private var prompt = ""
     @State private var isGenerating = false
-    @State private var generatedImage: UIImage?
+    @State private var generatedImage: PlatformImage?
     @State private var progress: Double = 0
     @State private var statusMessage = "Ready"
     @State private var generationTimeMs: UInt64 = 0
@@ -64,7 +72,9 @@ struct ImageGenerationView: View {
             }
         }
         .navigationTitle("Image Generation")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
     }
     
     // MARK: - Main Content
@@ -124,7 +134,7 @@ struct ImageGenerationView: View {
                 )
             
             if let image = generatedImage {
-                Image(uiImage: image)
+                platformImage(image)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -341,22 +351,37 @@ struct ImageGenerationView: View {
                 return true // continue generating
             }
             
-            // Convert result data to UIImage
+            // Convert result data to PlatformImage
             let imageData = result.imageData
             // Try to create image from PNG/JPEG data first
-            if let img = UIImage(data: imageData) {
+            #if os(iOS)
+            if let img = PlatformImage(data: imageData) {
                 generatedImage = img
             } else {
-                // Raw RGBA data - convert to UIImage
+                // Raw RGBA data - convert to image
                 let cgImage = createCGImage(
                     from: imageData,
                     width: Int(result.width),
                     height: Int(result.height)
                 )
                 if let cg = cgImage {
-                    generatedImage = UIImage(cgImage: cg)
+                    generatedImage = PlatformImage(cgImage: cg)
                 }
             }
+            #elseif os(macOS)
+            if let img = PlatformImage(data: imageData) {
+                generatedImage = img
+            } else {
+                let cgImage = createCGImage(
+                    from: imageData,
+                    width: Int(result.width),
+                    height: Int(result.height)
+                )
+                if let cg = cgImage {
+                    generatedImage = PlatformImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
+                }
+            }
+            #endif
             
             generationTimeMs = UInt64(result.generationTimeMs)
             statusMessage = "Done!"
@@ -391,6 +416,14 @@ struct ImageGenerationView: View {
             shouldInterpolate: true,
             intent: .defaultIntent
         )
+    }
+
+    private func platformImage(_ image: PlatformImage) -> Image {
+        #if os(iOS)
+        return Image(uiImage: image)
+        #elseif os(macOS)
+        return Image(nsImage: image)
+        #endif
     }
 }
 

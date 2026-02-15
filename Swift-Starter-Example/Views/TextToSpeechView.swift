@@ -52,7 +52,9 @@ struct TextToSpeechView: View {
                 }
             }
         }
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Text("Text to Speech")
@@ -60,7 +62,7 @@ struct TextToSpeechView: View {
                     .foregroundStyle(AppColors.textPrimary)
             }
             
-            ToolbarItem(placement: .navigationBarLeading) {
+            ToolbarItem(placement: .cancellationAction) {
                 Button {
                     dismiss()
                 } label: {

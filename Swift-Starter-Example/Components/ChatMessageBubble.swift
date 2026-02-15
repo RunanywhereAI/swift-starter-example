@@ -5,6 +5,9 @@
 //  RunAnywhere iOS SDK Starter App
 //
 
+#if canImport(UIKit)
+import UIKit
+#endif
 import SwiftUI
 
 struct ChatMessage: Identifiable, Equatable {
@@ -142,7 +145,11 @@ struct ChatMessageBubble: View {
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                 }
             }
+            #if os(iOS)
             .frame(maxWidth: UIScreen.main.bounds.width * 0.75, alignment: message.isUser ? .trailing : .leading)
+            #else
+            .frame(maxWidth: 500, alignment: message.isUser ? .trailing : .leading)
+            #endif
             
             if message.isUser {
                 // User Avatar

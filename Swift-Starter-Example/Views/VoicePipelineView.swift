@@ -92,7 +92,9 @@ struct VoicePipelineView: View {
                 }
             }
         }
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Text("Voice Pipeline")
@@ -100,7 +102,7 @@ struct VoicePipelineView: View {
                     .foregroundStyle(AppColors.textPrimary)
             }
             
-            ToolbarItem(placement: .navigationBarLeading) {
+            ToolbarItem(placement: .cancellationAction) {
                 Button {
                     stopSession()
                     dismiss()
@@ -110,7 +112,7 @@ struct VoicePipelineView: View {
                 }
             }
             
-            ToolbarItem(placement: .navigationBarTrailing) {
+            ToolbarItem(placement: .confirmationAction) {
                 if !conversationHistory.isEmpty {
                     Button {
                         conversationHistory.removeAll()
@@ -534,6 +536,7 @@ struct VoicePipelineView: View {
     }
     
     private func startListening() {
+        #if os(iOS)
         let session = AVAudioSession.sharedInstance()
         
         do {
@@ -554,6 +557,10 @@ struct VoicePipelineView: View {
             status = "Error: \(error.localizedDescription)"
             currentState = .error
         }
+        #else
+        // On macOS, AVAudioSession is not available; start recording directly
+        beginRecording()
+        #endif
     }
     
     private func beginRecording() {

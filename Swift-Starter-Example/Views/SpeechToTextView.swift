@@ -61,7 +61,9 @@ struct SpeechToTextView: View {
                 }
             }
         }
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Text("Speech to Text")
@@ -69,7 +71,7 @@ struct SpeechToTextView: View {
                     .foregroundStyle(AppColors.textPrimary)
             }
             
-            ToolbarItem(placement: .navigationBarLeading) {
+            ToolbarItem(placement: .cancellationAction) {
                 Button {
                     dismiss()
                 } label: {
@@ -78,7 +80,7 @@ struct SpeechToTextView: View {
                 }
             }
             
-            ToolbarItem(placement: .navigationBarTrailing) {
+            ToolbarItem(placement: .confirmationAction) {
                 if !transcriptionHistory.isEmpty {
                     Button {
                         transcriptionHistory.removeAll()
@@ -284,6 +286,7 @@ struct SpeechToTextView: View {
     }
     
     private func startRecording() {
+        #if os(iOS)
         let session = AVAudioSession.sharedInstance()
         
         do {
@@ -302,6 +305,10 @@ struct SpeechToTextView: View {
         } catch {
             transcription = "Error: \(error.localizedDescription)"
         }
+        #else
+        // On macOS, AVAudioSession is not available; start recording directly
+        beginRecording()
+        #endif
     }
     
     private func beginRecording() {

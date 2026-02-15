@@ -9,11 +9,19 @@ import SwiftUI
 import PhotosUI
 import RunAnywhere
 
+#if os(iOS)
+import UIKit
+private typealias PlatformImage = UIImage
+#elseif os(macOS)
+import AppKit
+private typealias PlatformImage = NSImage
+#endif
+
 struct VisionView: View {
     @EnvironmentObject var modelService: ModelService
     
     @State private var selectedPhoto: PhotosPickerItem?
-    @State private var selectedImage: UIImage?
+    @State private var selectedImage: PlatformImage?
     @State private var description = ""
     @State private var isProcessing = false
     @State private var prompt = "Describe this image in detail."
@@ -42,11 +50,13 @@ struct VisionView: View {
             }
         }
         .navigationTitle("Vision (VLM)")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .onChange(of: selectedPhoto) { _, newValue in
             Task {
                 if let data = try? await newValue?.loadTransferable(type: Data.self),
-                   let image = UIImage(data: data) {
+                   let image = PlatformImage(data: data) {
                     selectedImage = image
                     description = ""
                     errorMessage = nil
@@ -95,7 +105,7 @@ struct VisionView: View {
                 )
             
             if let image = selectedImage {
-                Image(uiImage: image)
+                platformImage(image)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -285,7 +295,19 @@ struct VisionView: View {
         tokensPerSecond = 0
         
         do {
+            #if os(iOS)
             let image = VLMImage(image: uiImage)
+            #elseif os(macOS)
+            // Convert NSImage to RGB data for VLM
+            guard let tiffData = uiImage.tiffRepresentation,
+                  let bitmap = NSBitmapImageRep(data: tiffData),
+                  let pngData = bitmap.representation(using: .png, properties: [:]) else {
+                errorMessage = "Failed to convert image"
+                isProcessing = false
+                return
+            }
+            let image = VLMImage(rgbPixels: pngData, width: Int(bitmap.pixelsWide), height: Int(bitmap.pixelsHigh))
+            #endif
             let result = try await RunAnywhere.processImageStream(
                 image,
                 prompt: prompt,
@@ -309,6 +331,14 @@ struct VisionView: View {
         }
         
         isProcessing = false
+    }
+
+    private func platformImage(_ image: PlatformImage) -> Image {
+        #if os(iOS)
+        return Image(uiImage: image)
+        #elseif os(macOS)
+        return Image(nsImage: image)
+        #endif
     }
 }
 

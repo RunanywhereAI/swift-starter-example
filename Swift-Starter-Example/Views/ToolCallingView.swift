@@ -78,7 +78,9 @@ struct ToolCallingView: View {
             }
         }
         .navigationTitle("Tool Calling")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .onAppear {
             if !toolsRegistered {
                 registerDemoTools()

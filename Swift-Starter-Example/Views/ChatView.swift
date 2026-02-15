@@ -51,7 +51,9 @@ struct ChatView: View {
                 }
             }
         }
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Text("Chat")
@@ -59,7 +61,7 @@ struct ChatView: View {
                     .foregroundStyle(AppColors.textPrimary)
             }
             
-            ToolbarItem(placement: .navigationBarLeading) {
+            ToolbarItem(placement: .cancellationAction) {
                 Button {
                     dismiss()
                 } label: {
@@ -68,7 +70,7 @@ struct ChatView: View {
                 }
             }
             
-            ToolbarItem(placement: .navigationBarTrailing) {
+            ToolbarItem(placement: .confirmationAction) {
                 if !messages.isEmpty {
                     Button {
                         messages.removeAll()

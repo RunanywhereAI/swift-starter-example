@@ -6,6 +6,9 @@
 //  Privacy-first, on-device AI for iOS
 //
 
+#if canImport(AppKit)
+import AppKit
+#endif
 import SwiftUI
 import RunAnywhere
 import LlamaCPPRuntime
@@ -32,7 +35,11 @@ struct Swift_Starter_ExampleApp: App {
                             .foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    #if os(iOS)
                     .background(Color(UIColor.systemBackground))
+                    #else
+                    .background(Color(NSColor.windowBackgroundColor))
+                    #endif
                 }
             }
             .preferredColorScheme(.dark)

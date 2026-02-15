@@ -40,7 +40,9 @@ struct HomeView: View {
                     .padding(.horizontal, 24)
                 }
             }
+            #if os(iOS)
             .navigationBarHidden(true)
+            #endif
         }
     }
     
